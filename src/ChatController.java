@@ -1,8 +1,5 @@
 import java.awt.AWTException;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -10,6 +7,8 @@ import java.net.Socket;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
 import javafx.application.Platform;
@@ -24,15 +23,16 @@ import javafx.scene.input.KeyEvent;
 
 public class ChatController extends Thread implements Initializable{
 
-    String nickbot = "Bisoidinho";
-    String token = "oauth:bc1dgp24hr3evjd2zvhmzckvrzimop";
-    String canal = "biscoitinho";
+    String nickbot = "";
+    String token = "";
+    String canal = "";
 
     //notifica
-    Notifica notif = new Notifica(nickbot,"/images/icon.png");
+    Notifica notif = new Notifica(nickbot,"images/icon.png");
 
-    String nomes[] = new String[150];
-    Boolean temnome = false;
+    List<String> nomes = new ArrayList<String>();
+    List<Filtro> listaFiltro = new ArrayList<Filtro>();
+
     Boolean ligado = true;
 
     String mensagem = "";
@@ -41,18 +41,15 @@ public class ChatController extends Thread implements Initializable{
     String tratada = "";
     String TWITCH_HOST = "irc.chat.twitch.tv";
     int TWITCH_PORT = 6667;
-    Socket socket;
     PrintWriter prt;
     InputStreamReader in;
     BufferedReader bf;
-    
+
+    //socket
+    Socket socket;
+
     //arquivo
-    String stringnomes;
-    FileReader reader;
-    BufferedReader breader;
-    PrintWriter clean;
-    FileWriter writer;
-    BufferedWriter bwriter;
+    Arquivos filebot;
 
     //tempo
     LocalTime now;
@@ -133,21 +130,28 @@ public class ChatController extends Thread implements Initializable{
         return (texto.getText().equals(""));
     }
 
-    //cria e verifica arquivo de nomes do bot
-    void leArquivoNomes() throws IOException{
-        for(int x = 0; x<150; x++){
-            nomes[x] = "";
+    public void setNickBot(String nickbot){
+        this.nickbot = nickbot;
+    }
+    public void setToken(String token){
+        this.token = token;
+    }
+    public void setCanal(String canal){
+        this.canal = canal;
+    }
+
+    //cria ou verifica arquivo de nomes do bot e config
+    void leArquivos() throws IOException{
+        filebot = new Arquivos();
+        this.canal = filebot.getCanal();
+        this.token = filebot.getToken();
+        this.nickbot = filebot.getNickBot();
+
+        if(filebot.getNameHist()){
+            this.nomes = filebot.getNames();
         }
-        stringnomes = "";
-        reader = new FileReader("nomes.txt");
-        breader = new BufferedReader(reader);
-        String linha;
-        while((linha = breader.readLine())!=null){
-            stringnomes += linha+"\n";
-        }
-        breader.close();
-        for(int x = 0; x<stringnomes.split("\n").length; x++){
-            nomes[x] = stringnomes.split("\n")[x];
+        if(filebot.getFiltroHist()){
+            this.listaFiltro = filebot.getListafiltro();
         }
     }
 
@@ -157,10 +161,8 @@ public class ChatController extends Thread implements Initializable{
         //variavel para conseguir enviar mensagem ao servidor.
         prt = new PrintWriter(socket.getOutputStream());
 
-
         in = new InputStreamReader(socket.getInputStream());
         bf = new BufferedReader(in);
-
 
         prt.println("PASS "+ token);
         prt.println("NICK "+ nickbot);
@@ -181,40 +183,44 @@ public class ChatController extends Thread implements Initializable{
             scrollText();
 
             //verifica o nome das pessoas no chat
-            
-            for(int x = 0; x<150;x++){
-                if(nomes[x] == ""){
-                    nomes[x] = ""+nick;
-                    now = LocalTime.now();
-                    String tempo = ""+now.toString().split(":")[0];
-                    if(Integer.parseInt(tempo) < 6){
-                        printChat("Boa madrugada "+ nick+ ", aproveite a live! <3");
-                    }
-                    else if(Integer.parseInt(tempo) <= 12){
-                        printChat("Bom dia "+ nick+ ", aproveite a live! <3");
-                    }
-                    else if(Integer.parseInt(tempo) <= 18){
-                        printChat("Boa tarde "+ nick+ ", aproveite a live! <3");
-                    }
-                    else{
-                        printChat("Boa noite "+ nick+ ", aproveite a live! <3");
-                    }
-                    break;
-                }
-                if(nomes[x].equals(nick)){
+            Boolean repetido = false;
+            for(int x = 0; x<nomes.size();x++){
+                if(nomes.get(x).equals(nick)){
+                    repetido = true;
                     break;
                 }
             }
-            if(tratada.equals("fon")){
-                printChat("fon 4Head");
-            }
-            else if(tratada.indexOf("!troll") !=-1){
-                printChat("mds esse OBATMAO é muito ruim.. patético");
-            }
-            else if(tratada.indexOf("!mendigo") !=-1){
-                printChat("só tem gente mendigando nesse jogo.. patético");
+            if(!repetido){
+                nomes.add(nick);
+                now = LocalTime.now();
+                String tempo = ""+now.toString().split(":")[0];
+                if(Integer.parseInt(tempo) < 6){
+                    printChat("Boa madrugada "+ nick+ ", aproveite a live! <3");
+                }
+                else if(Integer.parseInt(tempo) <= 12){
+                    printChat("Bom dia "+ nick+ ", aproveite a live! <3");
+                }
+                else if(Integer.parseInt(tempo) <= 18){
+                    printChat("Boa tarde "+ nick+ ", aproveite a live! <3");
+                }
+                else{
+                    printChat("Boa noite "+ nick+ ", aproveite a live! <3");
+                }
             }
 
+            //acessa a lista de filtro de mensagens
+            for(int x = 0; x<listaFiltro.size();x++){
+                if(listaFiltro.get(x).getCompleta()){
+                    if(listaFiltro.get(x).getKey().equals(tratada)){
+                        printChat(listaFiltro.get(x).getMensagem());
+                    }
+                }
+                else{
+                    if(tratada.indexOf(listaFiltro.get(x).getKey()) !=-1){
+                        printChat(listaFiltro.get(x).getMensagem());
+                    }
+                }
+            }
         }
     }
 
@@ -223,22 +229,12 @@ public class ChatController extends Thread implements Initializable{
         prt.println("QUIT");
         prt.flush();
 
-        clean = new PrintWriter("nomes.txt");
-        clean.close();
-
-        writer = new FileWriter("nomes.txt");
-        bwriter = new BufferedWriter(writer);
-        
-        for(int x = 0; x< 100; x++){
-            if(nomes[x].equals("")){
-                break;
-            }
-            bwriter.write(nomes[x]);
-            bwriter.newLine();
-        }
-        bwriter.close();
+        filebot.setConfig(this.nickbot, this.token, this.canal, this.nomes,this.listaFiltro);
+        filebot.saveFiles();
 
         ligado = false;
+
+
         socket.close();
         notif.closeMsg();
 
@@ -282,7 +278,7 @@ public class ChatController extends Thread implements Initializable{
 
         try {
             notif.notificaMsg();
-            leArquivoNomes();
+            leArquivos();
             conectaSocket();
         } catch (IOException | AWTException e) {
             e.printStackTrace();
