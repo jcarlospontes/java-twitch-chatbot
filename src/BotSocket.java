@@ -20,7 +20,7 @@ public class BotSocket {
     Boolean conectado = false;
 
     public static void main(String args[]) throws UnknownHostException, IOException, InterruptedException{
-        BotSocket bot = new BotSocket("Bisoidinho", "oauth:bc1dgp24hr3evjd2zvhmzckvrzimop", "biscoitinho");
+        BotSocket bot = new BotSocket("<username>", "oauth:<key>", "<user>");
         bot.criaSocket();
         long startTime = System.currentTimeMillis(); //fetch starting time
         bot.enviaMsg("PRIVMSG #"+ bot.canal+" :oie");
